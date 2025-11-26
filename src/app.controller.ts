@@ -1,5 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { Conversation, ConversationsService } from './conversation.service';
+import {
+  Conversation,
+  ConversationsService,
+  ConversationStats,
+} from './conversation.service';
 import { ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 class FilterDto {
@@ -27,10 +31,13 @@ export class AppController {
     });
   }
 
-  // @Get('stats')
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Get stats',
-  //   type: Conversation,
-  // })
+  @Get('stats')
+  @ApiResponse({
+    status: 200,
+    description: 'Get stats',
+    type: ConversationStats,
+  })
+  async stats(): Promise<ConversationStats> {
+    return this.svc.stats();
+  }
 }

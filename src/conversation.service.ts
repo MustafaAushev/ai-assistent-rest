@@ -4,7 +4,7 @@ import { Client } from 'pg';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ConversationStats {
-  constructor(args: any) {
+  constructor(args: ConversationStats) {
     Object.assign(this, args);
   }
 
@@ -30,7 +30,7 @@ export class ConversationStats {
 }
 
 export class Conversation {
-  constructor(args: any) {
+  constructor(args: Conversation) {
     Object.assign(this, args);
   }
 
@@ -84,7 +84,7 @@ export class ConversationsService {
       llm_response: string;
       context_chunks: { id: string; text: string }[];
       success: boolean;
-      feedback?: string;
+      feedback?: boolean;
       avg_context_score: number;
     }>(sql, parameters);
 
@@ -106,23 +106,23 @@ export class ConversationsService {
   }
 
   async stats(): Promise<ConversationStats> {
-    const { rows } = await this.pg.query<{ count: number; feedback: boolean }>(
+    const { rows } = await this.pg.query<{ count: string; feedback: boolean }>(
       /* sql */ ` SELECT count(*) as count, feedback FROM conversations group by feedback`,
     );
 
-    const successTotal = rows
-      .filter((r) => r.feedback)
-      .reduce((acc, cur) => acc + cur.count, 0);
-    const failedTotal = rows
-      .filter((r) => !r.feedback)
-      .reduce((acc, cur) => acc + cur.count, 0);
+    const successRow = rows.find((r) => r.feedback === true);
+    const failedRow = rows.find((r) => r.feedback === false);
 
-    const total = rows.reduce((acc, cur) => acc + cur.count, 0);
+    const totalAnswers = rows.reduce((acc, r) => acc + Number(r.count), 0);
+    const successTotal = successRow ? Number(successRow.count) : 0;
+    const failedTotal = failedRow ? Number(failedRow.count) : 0;
 
     return new ConversationStats({
-      total,
+      total: totalAnswers,
       successTotal,
       failedTotal,
+      failedPercent: Math.round((failedTotal / totalAnswers) * 100),
+      successPercent: Math.round((successTotal / totalAnswers) * 100),
     });
   }
 }
