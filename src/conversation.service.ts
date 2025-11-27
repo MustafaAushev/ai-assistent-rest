@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PG } from './const';
 import { Client } from 'pg';
 import { ApiProperty } from '@nestjs/swagger';
@@ -29,29 +29,41 @@ export class ConversationStats {
   total!: number;
 }
 
-export class Conversation {
-  constructor(args: Conversation) {
+export class ConversationPreview {
+  constructor(args: ConversationPreview) {
     Object.assign(this, args);
   }
 
   @ApiProperty()
   id!: string;
+
   @ApiProperty()
   username!: string;
+
   @ApiProperty()
   question!: string;
-  @ApiProperty()
-  contextChunks!: { id: string; text: string }[];
-  @ApiProperty()
-  llmResponse!: string;
+
   @ApiProperty({
     description: 'Нашла ли нейронка ответ в контексте документации',
   })
   success!: boolean;
+
   @ApiProperty({
     description: 'Удовлетворил ли пользователя ответ нейронки',
   })
   feedback?: boolean;
+}
+
+export class Conversation extends ConversationPreview {
+  constructor(args: Conversation) {
+    super(args);
+    Object.assign(this, args);
+  }
+
+  @ApiProperty()
+  contextChunks!: { id: string; text: string }[];
+  @ApiProperty()
+  llmResponse!: string;
   @ApiProperty()
   avgContextScore!: number;
 }
@@ -64,9 +76,11 @@ export class ConversationFilter {
 export class ConversationsService {
   constructor(@Inject(PG) private readonly pg: Client) {}
 
-  async getConversations(filter: ConversationFilter): Promise<Conversation[]> {
+  async getConversations(
+    filter: ConversationFilter,
+  ): Promise<ConversationPreview[]> {
     let sql = /* sql */ `
-      SELECT * FROM conversations
+      SELECT id, user_name, question, success, feedback FROM conversations
       WHERE 1=1
     `;
     const parameters: boolean[] = [];
@@ -81,28 +95,57 @@ export class ConversationsService {
       id: string;
       user_name: string;
       question: string;
-      llm_response: string;
-      context_chunks: { id: string; text: string }[];
       success: boolean;
       feedback?: boolean;
-      avg_context_score: number;
     }>(sql, parameters);
 
     const conversations = result.rows;
 
     return conversations.map(
       (r) =>
-        new Conversation({
+        new ConversationPreview({
           id: r.id,
           username: r.user_name,
           question: r.question,
-          contextChunks: r.context_chunks,
-          llmResponse: r.llm_response,
           success: r.success,
           feedback: r.feedback,
-          avgContextScore: r.avg_context_score,
         }),
     );
+  }
+
+  async getConversation(id: string): Promise<Conversation> {
+    const { rows } = await this.pg.query<{
+      id: string;
+      user_name: string;
+      question: string;
+      llm_response: string;
+      context_chunks: { id: string; text: string }[];
+      success: boolean;
+      feedback?: boolean;
+      avg_context_score: number;
+    }>(
+      /* sql */ `
+        SELECT * FROM conversations WHERE id = $1
+      `,
+      [id],
+    );
+
+    const conversation = rows[0];
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation with id ${id} not found`);
+    }
+
+    return new Conversation({
+      id: conversation.id,
+      username: conversation.user_name,
+      question: conversation.question,
+      contextChunks: conversation.context_chunks,
+      llmResponse: conversation.llm_response,
+      success: conversation.success,
+      feedback: conversation.feedback,
+      avgContextScore: conversation.avg_context_score,
+    });
   }
 
   async stats(): Promise<ConversationStats> {

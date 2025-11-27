@@ -1,6 +1,7 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   Conversation,
+  ConversationPreview,
   ConversationsService,
   ConversationStats,
 } from './conversation.service';
@@ -20,15 +21,25 @@ export class AppController {
   @ApiResponse({
     status: 200,
     description: 'Get conversations',
-    type: Conversation,
+    type: ConversationPreview,
   })
   async conversations(
     @Query() { success }: FilterDto,
-  ): Promise<Conversation[]> {
+  ): Promise<ConversationPreview[]> {
     return this.svc.getConversations({
       success:
         success === 'true' ? true : success === 'false' ? false : undefined,
     });
+  }
+
+  @Get('conversations/:id')
+  @ApiResponse({
+    status: 200,
+    description: 'Get conversations',
+    type: Conversation,
+  })
+  async conversation(@Param('id') id: string): Promise<Conversation> {
+    return this.svc.getConversation(id);
   }
 
   @Get('stats')
