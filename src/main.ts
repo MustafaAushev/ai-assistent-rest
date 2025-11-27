@@ -7,7 +7,11 @@ import { writeFileSync } from 'node:fs';
 configDotenv();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    cors: {
+      origin: '*',
+    },
+  });
 
   const config = new DocumentBuilder().setTitle('ai assistent rest').build();
 
